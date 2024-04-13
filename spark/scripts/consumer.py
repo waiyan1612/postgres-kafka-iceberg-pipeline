@@ -1,18 +1,34 @@
+import pyspark
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, get_json_object
+from pyspark.sql.types import StringType
 
 # This is the same KAFKA_ADVERTISED_LISTENERS defined in docker-compose.yaml
 KAFKA_BOOTSTRAP_SERVER = 'kafka-standalone:19092'
 KAFKA_TOPICS = 'cdc.commerce.*'
 
+# 
+ICEBERG_WAREHOUSE = '/out/iceberg/warehouse'
+ICEBERG_CHECKPOINT = '/out/spark/checkpoint/iceberg'
+
+# Configure spark catalogs. Note: Iceberg does not work with Spark's default hive metastore - https://github.com/apache/iceberg/issues/7847
+conf = (pyspark.SparkConf()
+    .set('spark.sql.extensions', 'org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions')
+    .set('spark.sql.catalog.spark_catalog', 'org.apache.iceberg.spark.SparkSessionCatalog')
+    .set('spark.sql.catalog.spark_catalog.type', 'hive')
+    .set('spark.sql.catalog.local', 'org.apache.iceberg.spark.SparkCatalog')
+    .set('spark.sql.catalog.local.type', 'hadoop')
+    .set('spark.sql.catalog.local.warehouse', ICEBERG_WAREHOUSE)
+)
 
 spark = (SparkSession.builder
     .master('local')
     .appName('cdc-consumer')
+    .config(conf=conf)
     .getOrCreate()
 )
 
-kafka_df = (spark.readStream
+kafka_stream = (spark.readStream
     .format('kafka')
     .option('kafka.bootstrap.servers', KAFKA_BOOTSTRAP_SERVER)
     .option('subscribePattern', KAFKA_TOPICS)
@@ -20,24 +36,41 @@ kafka_df = (spark.readStream
     .load()
 )
 
-cdc_df = kafka_df.selectExpr('cast(value as string) as value').select(
-    get_json_object(col('value'),'$.payload.before').alias('before'), 
-    get_json_object(col('value'),'$.payload.after').alias('after'), 
-    get_json_object(col('value'),'$.payload.op').alias('op')
-)
+cdc_stream = kafka_stream.select(
+    col('value').cast(StringType()).alias('val_str'),
+    get_json_object(col('val_str'),'$.payload.before').alias('before'),
+    get_json_object(col('val_str'),'$.payload.after').alias('after'),
+    get_json_object(col('val_str'),'$.payload.op').alias('op'),
+    col('topic'),
+).drop('val_str')
 
-stream = (kafka_df.writeStream
-    .format('console')
-    .outputMode('update')
-    .start()
-)
 
-cdc_stream = (cdc_df.writeStream
-    .format('console')
-    .outputMode('update')
-    .option('truncate', False)
-    .start()
-)
+# Console sinks for visualizing the streams
+kafka_stream.writeStream.format('console').outputMode('update').start()
+cdc_stream.writeStream.format('console').outputMode('update').option('truncate', False).start()
 
-stream.awaitTermination()
-cdc_stream.awaitTermination()
+
+"""
+Split the stream into individual DataFrames since we are listening to multiple topics.
+"""
+def split_by_topic(df, epoch_id):
+    topics = df.select('topic').distinct().rdd.flatMap(list).collect()
+    print(f'Found topics: {topics}')
+    for topic in topics:
+        topic_df = df.filter(col('topic') == topic).drop('topic')
+        db, schema, table = topic.split('.')    
+        iceberg_full_table_name = f'local.{db}.{schema}_{table}'
+        if spark.catalog.tableExists(iceberg_full_table_name):
+            topic_df.writeTo(iceberg_full_table_name).option('mergeSchema','true').append() # TODO: Switch to MERGE INTO.
+        else:
+            topic_df.writeTo(iceberg_full_table_name).tableProperty('write.spark.accept-any-schema', 'true').create()
+
+# Iceberg sink
+cdc_stream.writeStream.option('checkpointLocation', ICEBERG_CHECKPOINT).foreachBatch(split_by_topic).start()
+
+spark.streams.awaitAnyTermination()
+
+# Reading the Iceberg tables
+spark.read.table('local.cdc.commerce_account').show(truncate=False)
+spark.read.table('local.cdc.commerce_product').show(truncate=False)
+

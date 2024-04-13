@@ -55,9 +55,9 @@ services:
     image: 'apache/spark:3.5.1-java17-python3'
     container_name: kafka-spark
     # This will take time because it will download all the kafka dependencies for spark
-    command: /opt/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 --conf spark.driver.extraJavaOptions="-Divy.cache.dir=/.ivy -Divy.home=/.ivy" /scripts/consumer.py
+    command: /opt/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0 --conf spark.driver.extraJavaOptions="-Divy.cache.dir=/.ivy -Divy.home=/.ivy" /scripts/consumer.py
     # For debugging, pyspark shell can be used
-    # command: /opt/spark/bin/pyspark --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1 --conf spark.driver.extraJavaOptions="-Divy.cache.dir=/.ivy -Divy.home=/.ivy"
+    # command: /opt/spark/bin/pyspark --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0 --conf spark.driver.extraJavaOptions="-Divy.cache.dir=/.ivy -Divy.home=/.ivy"
     user: root # Required to write back to host volume
     volumes:
       - "$PWD/spark/scripts/:/scripts"

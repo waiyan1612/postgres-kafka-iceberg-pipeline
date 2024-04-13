@@ -5,14 +5,13 @@ Stream changes from databases as iceberg records.
 ## Contents
 ```sh
 ├── docker-compose.yaml                        -> Compose file to launch postgres and kafka
-├── data                                       -> Data from containers will be mounted to this path Configured in docker-compose file.
 ├── kafka
 │   ├── config
 │   │   ├── connect-file-sink.properties       -> File sink connector
 │   │   ├── connect-postgres-source.json       -> Postgres source connector
 │   │   └── connect-standalone.properties      -> Standalone kafka conenct config
 │   └── plugins
-│       └── debezium-connector-postgres        -> Debezium connector jars will be downloaded to this folder
+│       └── debezium-connector-postgres        -> Debezium connector jars should be downloaded to this folder
 ├── postgres
 │   ├── postgresql.conf                        -> Config with logical replication enabled
 │   └── scripts
@@ -27,8 +26,16 @@ Stream changes from databases as iceberg records.
     └── scripts
         └── consumer.py                        -> Pyspark streaming using kafka source and console sink
 ```
-
-
+Moreover, these folders will be created and mounted so that docker containers can write back to the host file system.
+```sh
+├── data                                       -> Data from containers will be mounted to this path Configured in docker-compose file.
+│   ├── kafka
+│   │   └── out/cdc.commerce.sink.txt          -> Output of Kafka File sink connector
+│   └── spark
+│       └── out
+│          └── iceberg/warehouse               -> Storage location used by Spark Iceberg sink for each table data + metadata
+│          └── spark/checkpoint                -> Checkpoint location used by Spark structured streaming
+```
 
 ## Setup Guide
 
@@ -103,4 +110,55 @@ curl -X PUT localhost:8083/connectors/dbz-pg-source/resume
 curl -X PUT localhost:8083/connectors/dbz-pg-source/restart
 curl -X PUT localhost:8083/connectors/dbz-pg-source/stop
 curl -X DELETE localhost:8083/connectors/dbz-pg-source
+```
+
+## Sample Outputs for Spark
+
+### Console sink
+```
+kafka-spark       | 24/04/13 09:53:25 INFO CodeGenerator: Code generated in 8.356917 ms
+kafka-spark       | +--------------------+--------------------+--------------------+---------+------+--------------------+-------------+
+kafka-spark       | |                 key|               value|               topic|partition|offset|           timestamp|timestampType|
+kafka-spark       | +--------------------+--------------------+--------------------+---------+------+--------------------+-------------+
+kafka-spark       | |[7B 22 73 63 68 6...|[7B 22 73 63 68 6...|cdc.commerce.account|        0|     0|2024-04-13 09:42:...|            0|
+kafka-spark       | |[7B 22 73 63 68 6...|[7B 22 73 63 68 6...|cdc.commerce.account|        0|     1|2024-04-13 09:42:...|            0|
+kafka-spark       | |[7B 22 73 63 68 6...|[7B 22 73 63 68 6...|cdc.commerce.account|        0|     2|2024-04-13 09:42:...|            0|
+kafka-spark       | |[7B 22 73 63 68 6...|[7B 22 73 63 68 6...|cdc.commerce.product|        0|     0|2024-04-13 09:42:...|            0|
+kafka-spark       | |[7B 22 73 63 68 6...|[7B 22 73 63 68 6...|cdc.commerce.product|        0|     1|2024-04-13 09:42:...|            0|
+kafka-spark       | +--------------------+--------------------+--------------------+---------+------+--------------------+-------------+
+```
+```
+kafka-spark       | -------------------------------------------
+kafka-spark       | Batch: 0
+kafka-spark       | -------------------------------------------
+kafka-spark       | 24/04/13 09:53:25 INFO CodeGenerator: Code generated in 11.099875 ms
+kafka-spark       | 24/04/13 09:53:25 INFO CodeGenerator: Code generated in 13.485375 ms
+kafka-spark       | +------+----------------------------------------------------------------------------------------+---+--------------------+
+kafka-spark       | |before|after                                                                                   |op |topic               |
+kafka-spark       | +------+----------------------------------------------------------------------------------------+---+--------------------+
+kafka-spark       | |NULL  |{"user_id":1,"email":"alice@example.com","created_at":1713000433266098}                 |r  |cdc.commerce.account|
+kafka-spark       | |NULL  |{"user_id":2,"email":"bob@example.com","created_at":1713000433266098}                   |r  |cdc.commerce.account|
+kafka-spark       | |NULL  |{"user_id":3,"email":"carol@example.com","created_at":1713000433266098}                 |r  |cdc.commerce.account|
+kafka-spark       | |NULL  |{"product_id":1,"product_name":"Live Edge Dining Table","created_at":1713000433267807}  |r  |cdc.commerce.product|
+kafka-spark       | |NULL  |{"product_id":2,"product_name":"Simple Teak Dining Chair","created_at":1713000433267807}|r  |cdc.commerce.product|
+kafka-spark       | +------+----------------------------------------------------------------------------------------+---+--------------------+
+```
+### Iceberg sink
+```
+>>> spark.read.table('local.cdc.commerce_account').show(truncate=False)
++------+-----------------------------------------------------------------------+---+
+|before|after                                                                  |op |
++------+-----------------------------------------------------------------------+---+
+|NULL  |{"user_id":1,"email":"alice@example.com","created_at":1713000433266098}|r  |
+|NULL  |{"user_id":2,"email":"bob@example.com","created_at":1713000433266098}  |r  |
+|NULL  |{"user_id":3,"email":"carol@example.com","created_at":1713000433266098}|r  |
++------+-----------------------------------------------------------------------+---+
+
+>>> spark.read.table('local.cdc.commerce_product').show(truncate=False)
++------+----------------------------------------------------------------------------------------+---+
+|before|after                                                                                   |op |
++------+----------------------------------------------------------------------------------------+---+
+|NULL  |{"product_id":1,"product_name":"Live Edge Dining Table","created_at":1713000433267807}  |r  |
+|NULL  |{"product_id":2,"product_name":"Simple Teak Dining Chair","created_at":1713000433267807}|r  |
++------+----------------------------------------------------------------------------------------+---+
 ```
