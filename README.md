@@ -8,21 +8,24 @@ Stream changes from databases as iceberg records.
 ├── data                                       -> Data from containers will be mounted to this path Configured in docker-compose file.
 ├── kafka
 │   ├── config
-│   │   ├── connect-file-sink.properties       -> File Sink
-│   │   ├── connect-postgres-source.json       -> Postgres Source via debezium
+│   │   ├── connect-file-sink.properties       -> File sink connector
+│   │   ├── connect-postgres-source.json       -> Postgres source connector
 │   │   └── connect-standalone.properties      -> Standalone kafka conenct config
 │   └── plugins
 │       └── debezium-connector-postgres        -> Debezium connector jars will be downloaded to this folder
-└── postgres
-    ├── postgresql.conf                        -> Config with logical replication enabled
+├── postgres
+│   ├── postgresql.conf                        -> Config with logical replication enabled
+│   └── scripts
+│       ├── manual
+│       │   ├── 001_insert.sql
+│       │   ├── 002_update.sql
+│       │   └── 003_delete.sql
+│       └── seed                               -> SQL scripts that will be run the first time the db is created i.e. when the data directory is empty
+│           ├── 000_init.sql
+│           └── 001_insert.sql
+└── spark
     └── scripts
-        ├── manual
-        │   ├── 001_insert.sql
-        │   ├── 002_update.sql
-        │   └── 003_delete.sql
-        └── seed                               -> SQL scripts that will be run the first time the db is created i.e. when the data directory is empty
-            ├── 000_init.sql                   -> SQL scripts to create schemas and tables
-            └── 001_insert.sql                 -> SQL scripts 
+        └── consumer.py                        -> Pyspark streaming using kafka source and console sink
 ```
 
 
@@ -44,10 +47,14 @@ Stream changes from databases as iceberg records.
     2. Start the Kafka in KRaft mode and Kafka Conenct in Standalone mode. The plugins from the previosuly step will be loaded
 
     ```sh
-    docker compose -f docker-compose.yaml up
+    docker compose up
+    ```
+    Or if you also want to start the spark container.
+    ```
+    docker compose --profile spark up
     ```
 
-3. Create and start the connectors.
+3. Create and start the kafka connectors.
     ```sh
     docker container exec -d kafka-standalone \
       /opt/kafka/bin/connect-standalone.sh \
@@ -55,6 +62,9 @@ Stream changes from databases as iceberg records.
       /opt/kafka/config-cdc/connect-postgres-source.json \
       /opt/kafka/config-cdc/connect-file-sink.properties
     ```
+
+4. You can now run the CUD operations on postgres and the changes should be streamed to the sinks.
+
 
 ## Helpful Commands for Debugging
 
