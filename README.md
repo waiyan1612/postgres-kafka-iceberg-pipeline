@@ -1,6 +1,6 @@
 # POSTGRES-KAFKA-ICEBERG-PIPELINE
 
-Stream changes from databases as iceberg records.
+Example pipeline to stream the data changes from RDBMS to Apache Iceberg tables.
 
 ## Contents
 ```sh
@@ -16,15 +16,10 @@ Stream changes from databases as iceberg records.
 │   ├── postgresql.conf                        -> Config with logical replication enabled
 │   └── scripts
 │       ├── manual
-│       │   ├── 001_insert.sql
-│       │   ├── 002_update.sql
-│       │   └── 003_delete.sql
 │       └── seed                               -> SQL scripts that will be run the first time the db is created i.e. when the data directory is empty
-│           ├── 000_init.sql
-│           └── 001_insert.sql
 └── spark
-    └── scripts
-        └── consumer.py                        -> Pyspark streaming using kafka source and console sink
+    └── scripts/consumer.py                    -> Pyspark streaming using kafka source and console sink
+
 ```
 Moreover, these folders will be created and mounted so that docker containers can write back to the host file system.
 ```sh
@@ -33,7 +28,7 @@ Moreover, these folders will be created and mounted so that docker containers ca
 │   │   └── out/cdc.commerce.sink.txt          -> Output of Kafka File sink connector
 │   └── spark
 │       └── out
-│          └── iceberg/warehouse               -> Storage location used by Spark Iceberg sink for each table data + metadata
+│          ├── iceberg/warehouse               -> Storage location used by Spark Iceberg sink for each table data + metadata
 │          └── spark/checkpoint                -> Checkpoint location used by Spark structured streaming
 ```
 
@@ -56,7 +51,7 @@ Moreover, these folders will be created and mounted so that docker containers ca
     ```sh
     docker compose up
     ```
-    Or if you also want to start the spark container.
+    Or if you also want to start the spark container. This will also download the kafka and iceberg dependency jars.
     ```
     docker compose --profile spark up
     ```
@@ -74,6 +69,11 @@ Moreover, these folders will be created and mounted so that docker containers ca
 
 
 ## Helpful Commands for Debugging
+
+### One-liner to wipe data directory while keeping .gitkeep files
+```sh
+find ./data ! -name .gitkeep -delete
+```
 
 ### List kafka topics
 ```sh
