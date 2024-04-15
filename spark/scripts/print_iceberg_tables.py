@@ -5,12 +5,8 @@ from pyspark.sql import SparkSession
 catalog_type = sys.argv[1]
 if catalog_type == 'kafka':
     warehouse_path = '/out-kafka/iceberg/warehouse'
-    account_table = 'iceberg.commerce.account'
-    product_table = 'iceberg.commerce.product'
 elif catalog_type == 'spark':
     warehouse_path = '/out-spark/iceberg/warehouse'
-    account_table = 'iceberg.cdc.commerce_account'
-    product_table = 'iceberg.cdc.commerce_product'
 else:
     raise ValueError('Invalid catalog type. Use either kafka or spark')
 
@@ -30,5 +26,5 @@ spark = (SparkSession.builder
 
 spark.sparkContext.setLogLevel("ERROR")
 
-spark.read.table(account_table).show(truncate=False)
-spark.read.table(product_table).show(truncate=False)
+spark.read.table('iceberg.cdc.commerce_account').show(truncate=False)
+spark.read.table('iceberg.cdc.commerce_product').show(truncate=False)

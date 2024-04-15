@@ -8,6 +8,7 @@
 
         "transforms": "debezium",
         "transforms.debezium.type": "io.tabular.iceberg.connect.transforms.DebeziumTransform",
+        "transforms.debezium.cdc.target.pattern": "cdc.{db}_{table}",
         "iceberg.tables.cdc-field": "_cdc.op",
         "iceberg.tables.route-field": "_cdc.target",
         "iceberg.tables.dynamic-enabled": "true",
@@ -20,7 +21,7 @@
         "iceberg.catalog.type": "hadoop",
         "iceberg.catalog.warehouse": "/out-kafka/iceberg/warehouse",
         
-        "iceberg.table.commerce.account.id-columns": "user_id",
-        "iceberg.table.commerce.product.id-columns": "product_id"
+        "iceberg.table.cdc.commerce_account.id-columns": "user_id",
+        "iceberg.table.cdc.commerce_product.id-columns": "product_id"
     }
 }
