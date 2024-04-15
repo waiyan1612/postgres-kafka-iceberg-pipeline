@@ -1,0 +1,26 @@
+{
+    "name": "iceberg-sink",
+    "config": {
+        "connector.class": "io.tabular.iceberg.connect.IcebergSinkConnector",
+        "tasks.max": "1",
+        "errors.log.enable": "true",
+        "topics.regex": "cdc.commerce.*",
+
+        "transforms": "debezium",
+        "transforms.debezium.type": "io.tabular.iceberg.connect.transforms.DebeziumTransform",
+        "iceberg.tables.cdc-field": "_cdc.op",
+        "iceberg.tables.route-field": "_cdc.target",
+        "iceberg.tables.dynamic-enabled": "true",
+        "iceberg.tables.auto-create-enabled": "true",
+        "iceberg.tables.evolve-schema-enabled": "true",
+        "iceberg.tables.upsert-mode-enabled": "true",
+        "iceberg.control.commit.interval-ms": "10000",
+        "iceberg.control.commit.timeout-ms": "60000",
+
+        "iceberg.catalog.type": "hadoop",
+        "iceberg.catalog.warehouse": "/out-kafka/iceberg/warehouse",
+        
+        "iceberg.table.commerce.account.id-columns": "user_id",
+        "iceberg.table.commerce.product.id-columns": "product_id"
+    }
+}

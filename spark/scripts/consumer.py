@@ -7,18 +7,19 @@ from pyspark.sql.types import StringType
 KAFKA_BOOTSTRAP_SERVER = 'kafka-standalone:19092'
 KAFKA_TOPICS = 'cdc.commerce.*'
 
-# 
-ICEBERG_WAREHOUSE = '/out/iceberg/warehouse'
-ICEBERG_CHECKPOINT = '/out/spark/checkpoint/iceberg'
+SPARK_ICEBERG_WAREHOUSE_PATH = '/out-spark/iceberg/warehouse' 
+ICEBERG_CHECKPOINT_PATH = '/out/spark/checkpoint/iceberg'
+CATALOG_NAME = 'iceberg'
 
 # Configure spark catalogs. Note: Iceberg does not work with Spark's default hive metastore - https://github.com/apache/iceberg/issues/7847
 conf = (pyspark.SparkConf()
+    .set('spark.sql.shuffle.partitions', '2')
     .set('spark.sql.extensions', 'org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions')
     .set('spark.sql.catalog.spark_catalog', 'org.apache.iceberg.spark.SparkSessionCatalog')
     .set('spark.sql.catalog.spark_catalog.type', 'hive')
-    .set('spark.sql.catalog.local', 'org.apache.iceberg.spark.SparkCatalog')
-    .set('spark.sql.catalog.local.type', 'hadoop')
-    .set('spark.sql.catalog.local.warehouse', ICEBERG_WAREHOUSE)
+    .set(f'spark.sql.catalog.{CATALOG_NAME}', 'org.apache.iceberg.spark.SparkCatalog')
+    .set(f'spark.sql.catalog.{CATALOG_NAME}.type', 'hadoop')
+    .set(f'spark.sql.catalog.{CATALOG_NAME}.warehouse', SPARK_ICEBERG_WAREHOUSE_PATH)
 )
 
 spark = (SparkSession.builder
@@ -59,18 +60,14 @@ def split_by_topic(df, epoch_id):
     for topic in topics:
         topic_df = df.filter(col('topic') == topic).drop('topic')
         db, schema, table = topic.split('.')    
-        iceberg_full_table_name = f'local.{db}.{schema}_{table}'
+        iceberg_full_table_name = f'{CATALOG_NAME}.{db}.{schema}_{table}'
         if spark.catalog.tableExists(iceberg_full_table_name):
             topic_df.writeTo(iceberg_full_table_name).option('mergeSchema','true').append() # TODO: Switch to MERGE INTO.
         else:
             topic_df.writeTo(iceberg_full_table_name).tableProperty('write.spark.accept-any-schema', 'true').create()
 
 # Iceberg sink
-cdc_stream.writeStream.option('checkpointLocation', ICEBERG_CHECKPOINT).foreachBatch(split_by_topic).start()
+cdc_stream.writeStream.option('checkpointLocation', ICEBERG_CHECKPOINT_PATH).foreachBatch(split_by_topic).start()
 
 spark.streams.awaitAnyTermination()
-
-# Reading the Iceberg tables
-spark.read.table('local.cdc.commerce_account').show(truncate=False)
-spark.read.table('local.cdc.commerce_product').show(truncate=False)
 

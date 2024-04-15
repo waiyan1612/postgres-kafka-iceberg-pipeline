@@ -29,7 +29,7 @@ services:
       - "$PWD/kafka/config:/opt/kafka/config-cdc"
       - "$PWD/kafka/plugins:/opt/kafka/plugins"
       - "$PWD/data/kafka/tmp:/tmp"
-      - "$PWD/data/kafka/out:/out"
+      - "$PWD/data/kafka/out:/out-kafka"
     deploy:
       replicas: 1
 
@@ -50,16 +50,13 @@ services:
       replicas: 1
 
   kafka-spark:
-    profiles: 
-      - spark
     image: 'apache/spark:3.5.1-java17-python3'
     container_name: kafka-spark
     # This will take time because it will download all the kafka dependencies for spark
     command: /opt/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0 --conf spark.driver.extraJavaOptions="-Divy.cache.dir=/.ivy -Divy.home=/.ivy" /scripts/consumer.py
-    # For debugging, pyspark shell can be used
-    # command: /opt/spark/bin/pyspark --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.0 --conf spark.driver.extraJavaOptions="-Divy.cache.dir=/.ivy -Divy.home=/.ivy"
     user: root # Required to write back to host volume
     volumes:
       - "$PWD/spark/scripts/:/scripts"
-      - "$PWD/data/spark/.ivy/:/.ivy"
-      - "$PWD/data/spark/out/:/out"
+      - "$PWD/spark/.ivy/:/.ivy"
+      - "$PWD/data/spark/out/:/out-spark"
+      - "$PWD/data/kafka/out/:/out-kafka"

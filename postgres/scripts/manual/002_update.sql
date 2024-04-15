@@ -1,1 +1,1 @@
-UPDATE commerce.account SET email = 'emily@example.com' WHERE email = 'emma@example.com';
+UPDATE commerce.account SET email = 'emma@example.com' WHERE email = 'emily@example.com';
