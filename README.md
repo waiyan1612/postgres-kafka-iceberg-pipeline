@@ -5,6 +5,8 @@ Example pipeline to stream the data changes from RDBMS to Apache Iceberg tables 
 1. Manually processing the Kafka messages via Spark
 2. Using Kafka Sink Connector for Iceberg from [iceberg-kafka-connect](https://github.com/tabular-io/iceberg-kafka-connect/) repo
 
+https://github.com/waiyan1612/postgres-kafka-iceberg-pipeline/assets/8967715/91d59de8-60e2-4e4c-b54a-47c1d36039a3
+
 ## Contents
 ```sh
 ├── docker-compose.yaml                        -> Compose file to launch postgres, kafka and spark containers
